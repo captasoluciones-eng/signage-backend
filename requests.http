@@ -1,0 +1,111 @@
+### Digital Signage backend -- curl / .http test collection
+### Works with the VS Code "REST Client" extension, or copy each curl
+### equivalent (given as a comment above each block) into a shell.
+###
+### Set these before running:
+@baseUrl = http://localhost:8080
+@deviceId = tv-sucursal-centro-01
+@adminIdToken = PASTE_A_FIREBASE_ID_TOKEN_HERE
+
+### 1) Register a brand-new device (idempotent -- safe to re-run).
+# curl -s -X POST "$BASE_URL/register" -H "Content-Type: application/json" \
+#   -d '{"deviceId":"tv-sucursal-centro-01","screenWidth":1920,"screenHeight":1080}'
+POST {{baseUrl}}/register
+Content-Type: application/json
+
+{
+  "deviceId": "{{deviceId}}",
+  "screenWidth": 1920,
+  "screenHeight": 1080
+}
+
+### 2) Get the playlist for a pending (unpaired) device -- expect items: [].
+# curl -s "$BASE_URL/playlist?deviceId=tv-sucursal-centro-01"
+GET {{baseUrl}}/playlist?deviceId={{deviceId}}
+
+### 3) After pairing in the admin panel (see /admin/pairing below), fetch the
+### playlist again -- capture the ETag response header for the next call.
+# curl -si "$BASE_URL/playlist?deviceId=tv-sucursal-centro-01" -H "X-Device-Key: dk_xxx"
+GET {{baseUrl}}/playlist?deviceId={{deviceId}}
+X-Device-Key: dk_REPLACE_WITH_ISSUED_KEY
+
+### 4) Demonstrate 304 Not Modified: resend the same ETag via If-None-Match.
+### Expect: HTTP/1.1 304 Not Modified, empty body.
+# curl -si "$BASE_URL/playlist?deviceId=tv-sucursal-centro-01" \
+#   -H "X-Device-Key: dk_xxx" -H 'If-None-Match: "PASTE_ETAG_FROM_STEP_3"'
+GET {{baseUrl}}/playlist?deviceId={{deviceId}}
+X-Device-Key: dk_REPLACE_WITH_ISSUED_KEY
+If-None-Match: "PASTE_ETAG_FROM_STEP_3"
+
+### 5) Heartbeat -- always returns 204 immediately (writes are async/batched).
+# curl -si -X POST "$BASE_URL/heartbeat" -H "Content-Type: application/json" -d '{
+#   "deviceId":"tv-sucursal-centro-01","appVersion":"1.4.2","itemActual":"2",
+#   "uptime":3600.5,"ultimoError":null,"screenWidth":1920,"screenHeight":1080}'
+POST {{baseUrl}}/heartbeat
+Content-Type: application/json
+
+{
+  "deviceId": "{{deviceId}}",
+  "appVersion": "1.4.2",
+  "itemActual": "2",
+  "uptime": 3600.5,
+  "ultimoError": null,
+  "screenWidth": 1920,
+  "screenHeight": 1080
+}
+
+### --- Admin API (all require a Firebase ID token for an allow-listed email) ---
+
+### 6) Who am I (sanity check for the bearer token / allow-list).
+# curl -s "$BASE_URL/admin/whoami" -H "Authorization: Bearer $ID_TOKEN"
+GET {{baseUrl}}/admin/whoami
+Authorization: Bearer {{adminIdToken}}
+
+### 7) Pair the pending device created in step 1 (use the 6-digit pairingCode
+### returned by /register).
+# curl -s -X POST "$BASE_URL/admin/pairing" -H "Authorization: Bearer $ID_TOKEN" \
+#   -H "Content-Type: application/json" \
+#   -d '{"pairingCode":"123456","nombre":"Sucursal Centro","groupId":"norte"}'
+POST {{baseUrl}}/admin/pairing
+Authorization: Bearer {{adminIdToken}}
+Content-Type: application/json
+
+{
+  "pairingCode": "123456",
+  "nombre": "Sucursal Centro",
+  "groupId": "norte"
+}
+
+### 8) List devices.
+GET {{baseUrl}}/admin/devices
+Authorization: Bearer {{adminIdToken}}
+
+### 9) Send a command to a device.
+POST {{baseUrl}}/admin/devices/{{deviceId}}/command
+Authorization: Bearer {{adminIdToken}}
+Content-Type: application/json
+
+{
+  "command": "reload"
+}
+
+### 10) Dashboard summary.
+GET {{baseUrl}}/admin/dashboard/summary
+Authorization: Bearer {{adminIdToken}}
+
+### --- Scheduler-triggered job endpoints (normally called by Cloud Scheduler
+### with an OIDC token; for local testing set SCHEDULER_DEV_SHARED_SECRET in
+### backend/.env and pass it via X-Scheduler-Key instead). ---
+
+### 11) Mark stale devices offline.
+# curl -s -X POST "$BASE_URL/jobs/mark-offline-devices" -H "X-Scheduler-Key: local-dev-secret"
+POST {{baseUrl}}/jobs/mark-offline-devices
+X-Scheduler-Key: local-dev-secret
+
+### 12) Hourly device snapshot into BigQuery.
+POST {{baseUrl}}/jobs/snapshot-devices
+X-Scheduler-Key: local-dev-secret
+
+### 13) Daily heartbeat purge.
+POST {{baseUrl}}/jobs/purge-old-heartbeats
+X-Scheduler-Key: local-dev-secret

@@ -1,0 +1,64 @@
+rules_version = '2';
+
+// Firestore security rules.
+//
+// The backend (Cloud Run service account, via the Admin SDK / server client
+// libraries) bypasses these rules entirely -- it authenticates with its
+// service account and always has full access. These rules only govern
+// DIRECT client access, which in this system is limited to:
+//   - the admin panel's Firebase JS SDK doing realtime `onSnapshot`
+//     subscriptions for live device status (read-only, allow-listed emails).
+// The Android TV players never talk to Firestore directly; they only call
+// the FastAPI endpoints (device-key authenticated), so no rule here needs to
+// account for them.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAllowedAdmin() {
+      // Keep in sync with backend ADMIN_EMAIL_ALLOWLIST. Firestore rules
+      // can't read that env var, so the allow-list is duplicated here;
+      // treat the backend's server-side check as the source of truth for
+      // anything that mutates data, and this rule as a read-only client
+      // convenience for the live dashboard.
+      return isSignedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in [
+          'jesusbeltran@captasoluciones.com'
+        ];
+    }
+
+    match /devices/{deviceId} {
+      allow read: if isAllowedAdmin();
+      allow write: if false; // all writes go through the backend API
+
+      match /heartbeats/{heartbeatId} {
+        allow read: if isAllowedAdmin();
+        allow write: if false;
+      }
+    }
+
+    match /groups/{groupId} {
+      allow read: if isAllowedAdmin();
+      allow write: if false;
+    }
+
+    match /playlists/{playlistId} {
+      allow read: if isAllowedAdmin();
+      allow write: if false;
+    }
+
+    match /assets/{assetId} {
+      allow read: if isAllowedAdmin();
+      allow write: if false;
+    }
+
+    // Deny everything else by default.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
