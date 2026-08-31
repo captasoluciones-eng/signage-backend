@@ -63,7 +63,7 @@ later steps depend on earlier ones:
 ```bash
 cd infra/terraform
 cp terraform.tfvars.example terraform.tfvars
-# edit terraform.tfvars: project_id, backend_image, assets_bucket_name, cdn_domain, ...
+# edit terraform.tfvars: project_id, backend_image, assets_bucket_name, ...
 
 terraform init
 terraform apply -target=google_project_service.required
@@ -219,20 +219,52 @@ curl -si "$BASE/playlist?deviceId=tv-demo-01" \
   invalidated by every admin write that could change a device's resolved
   playlist (command, overlay, group reassignment, group/playlist edits,
   pairing). A cache hit does zero Firestore reads -- see `app/cache.py`.
-- **Heartbeats**: buffered in memory, flushed every 15s in one Firestore
-  batched write (device state) + chunked BigQuery streaming inserts of up to
-  500 rows (`app/heartbeat_buffer.py`). `POST /heartbeat` never awaits either
-  of those -- it just appends to the buffer and returns `204`.
-- Cloud Run is configured with `min-instances=1` (keeps the cache warm and
-  the flush loop alive), `max-instances=10`, `concurrency=80`, and
-  `cpu_idle=false` (`--no-cpu-throttling`) so the background flush task keeps
-  running between requests. Target: p95 < 150ms for `GET /playlist` on a
-  cache hit -- with zero Firestore round-trips and a pure in-memory ETag
-  comparison, the request path is a JSON-serialize + hash, well within budget
-  on Cloud Run's smallest CPU tier.
+- **Heartbeats**: buffered in memory, flushed in one Firestore batched write
+  (device state) + chunked BigQuery streaming inserts of up to 500 rows
+  (`app/heartbeat_buffer.py`). Almost every `POST /heartbeat` just appends to
+  the buffer and returns `204` immediately (no Firestore/BigQuery wait); only
+  the occasional request that crosses the 15s flush interval since the last
+  flush awaits `flush_once()` inline before responding -- deliberately, so the
+  flush always runs while Cloud Run has CPU allocated for that request (see
+  below). A `POST /jobs/flush-heartbeats` Cloud Scheduler job (every minute)
+  is a safety net so a lull in device traffic can't leave the buffer stuck
+  unflushed indefinitely.
+- Cloud Run is configured with `min-instances=0` and the default
+  `cpu_idle=true` (CPU only allocated while handling a request) -- it scales
+  to zero between polls. This is what keeps the service inside Cloud Run's
+  free tier at ~100-device traffic volumes (see Cost, below); it's also why
+  there's no always-on background task anywhere in this service. Target:
+  p95 < 150ms for `GET /playlist` on a cache hit (post-cold-start) -- with
+  zero Firestore round-trips and a pure in-memory ETag comparison, the
+  request path is a JSON-serialize + hash, well within budget on Cloud Run's
+  smallest CPU tier.
 - With ~100 devices polling every ~5 minutes (plus jitter), sustained load is
   well under 1 req/s; the architecture has headroom for 10x that without
-  changes.
+  changes. If p95 latency from cold starts (scale-to-zero) ever becomes a
+  real problem, raising `min_instances` to 1 fixes it at the cost of most of
+  the free-tier savings below.
+
+## 6b. Cost
+
+This was deliberately designed to undercut a per-screen SaaS subscription
+(e.g. ~$13.50/screen/month), not just to be "cheaper GCP infra":
+
+- Firestore, BigQuery, Cloud Scheduler (4 jobs) and Artifact Registry storage
+  all stay within their free tiers at this traffic volume.
+- Cloud Run at `min_instances=0` / `cpu_idle=true`: ~100 devices polling
+  `/playlist` every ~5 minutes plus heartbeats is well under the free tier's
+  2M requests/month and 180,000 vCPU-seconds/month.
+- No Cloud CDN / HTTP(S) load balancer in front of the assets bucket -- that
+  combo has a fixed ~$18-25/month cost (the global forwarding rule) no matter
+  how little traffic it serves, which isn't worth it yet. Assets are served
+  directly from `https://storage.googleapis.com/<bucket>/...` instead (see
+  `app/gcs_client.py`).
+- The only real variable cost is network egress + storage for the actual
+  video/image assets themselves, which scales with how much content you
+  upload and how often it's fetched -- typically a few dollars/month, not a
+  per-screen fee. Add Cloud CDN back (a previous version of `storage.tf` had
+  it) once/if that egress cost or edge-caching latency actually justifies the
+  fixed cost.
 
 ## 7. Extending the offline-alert hook
 

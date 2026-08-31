@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
 from app.bigquery_client import BigQueryClient, get_bigquery_client
 from app.cache import playlist_cache
@@ -77,6 +77,19 @@ async def snapshot_devices(
     ]
     bq.insert_device_snapshots(rows)
     return {"snapshotted": len(rows)}
+
+
+@router.post("/flush-heartbeats")
+async def flush_heartbeats(request: Request) -> dict:
+    """Runs every minute. Safety-net flush of the in-memory heartbeat buffer
+    (see app/heartbeat_buffer.py) -- the buffer normally flushes itself
+    opportunistically on request traffic, but with Cloud Run scaled to zero
+    a lull in device polling could otherwise leave a small tail unflushed
+    indefinitely. This job guarantees a bounded staleness.
+    """
+    buffer = request.app.state.heartbeat_buffer
+    n = await buffer.flush_once()
+    return {"flushed": n}
 
 
 @router.post("/purge-old-heartbeats")

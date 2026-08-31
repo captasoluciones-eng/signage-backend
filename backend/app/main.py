@@ -4,10 +4,12 @@ FastAPI application entrypoint for the digital signage backend.
 Run locally:
     uvicorn app.main:app --reload --port 8080
 
-Deployed on Cloud Run (see infra/) with min-instances=1, max-instances=10,
+Deployed on Cloud Run (see infra/) with min-instances=0, max-instances=10,
 concurrency=80 -- the in-process playlist cache and heartbeat buffer are
 per-container singletons, which is the intended design at this scale
-(~100 devices).
+(~100 devices). min-instances=0 (scale to zero) keeps this within Cloud
+Run's free tier for this traffic volume; see heartbeat_buffer.py for how
+heartbeat flushing stays correct without an always-on background task.
 """
 from __future__ import annotations
 
@@ -42,7 +44,6 @@ async def lifespan(app: FastAPI):
         flush_interval=settings.heartbeat_flush_interval_seconds,
     )
     app.state.heartbeat_buffer = buffer
-    buffer.start()
     logger.info("Signage backend started. project=%s dataset=%s", settings.gcp_project, settings.bq_dataset)
     try:
         yield

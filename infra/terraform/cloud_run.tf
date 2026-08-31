@@ -26,8 +26,11 @@ resource "google_cloud_run_v2_service" "backend" {
           cpu    = "1"
           memory = "512Mi"
         }
-        cpu_idle = false # keep CPU allocated so the heartbeat-flush background
-                          # task and in-process cache keep working between requests
+        cpu_idle = true # default: CPU only allocated during request handling,
+                         # required to scale to zero / stay within the Cloud Run
+                         # free tier -- see app/heartbeat_buffer.py for how
+                         # heartbeat flushing stays correct without an always-on
+                         # background task
       }
 
       env {

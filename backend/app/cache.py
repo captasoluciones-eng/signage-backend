@@ -10,10 +10,12 @@ Design goals (per spec):
   against Firestore on read. Instead, admin write-paths call `invalidate_*`
   explicitly the moment they mutate a playlist/group/device, so the cache is
   correct *and* cheap: a hit is a pure dict lookup.
-- Per Cloud Run container: this is process-local. With min-instances=1 and
-  concurrency=80 this still gives a very high hit rate; with more containers
-  each just has its own warm cache, which is an acceptable tradeoff for a
-  read-mostly, ~100 device workload.
+- Per Cloud Run container: this is process-local. With min-instances=0 the
+  cache is cold after a scale-to-zero cold start, but at concurrency=80 and
+  ~100 devices polling every ~5 minutes it warms up within the first handful
+  of requests and stays warm for as long as the container stays alive; with
+  more containers each just has its own warm cache, which is an acceptable
+  tradeoff for a read-mostly, ~100 device workload.
 """
 from __future__ import annotations
 

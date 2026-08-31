@@ -94,11 +94,10 @@ gcloud run deploy signage-backend \
   --image="${IMAGE}" \
   --region="${REGION}" \
   --service-account="${BACKEND_SA}" \
-  --min-instances=1 \
+  --min-instances=0 \
   --max-instances=10 \
   --concurrency=80 \
   --cpu=1 --memory=512Mi \
-  --no-cpu-throttling \
   --allow-unauthenticated \
   --set-env-vars="GCP_PROJECT=${PROJECT_ID},GCP_REGION=${REGION},BQ_DATASET=signage,BQ_LOCATION=${BQ_LOCATION},GCS_ASSETS_BUCKET=${ASSETS_BUCKET},FIREBASE_PROJECT_ID=${PROJECT_ID},ADMIN_EMAIL_ALLOWLIST=${ADMIN_EMAIL_ALLOWLIST},SCHEDULER_SERVICE_ACCOUNT_EMAIL=${SCHEDULER_SA},CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS}"
 
@@ -117,6 +116,12 @@ gcloud scheduler jobs create http signage-mark-offline-devices \
   --uri="${BACKEND_URL}/jobs/mark-offline-devices" --http-method=POST \
   --oidc-service-account-email="${SCHEDULER_SA}" \
   --oidc-token-audience="${BACKEND_URL}/jobs/mark-offline-devices" || true
+
+gcloud scheduler jobs create http signage-flush-heartbeats \
+  --location="${REGION}" --schedule="* * * * *" --time-zone="America/Mazatlan" \
+  --uri="${BACKEND_URL}/jobs/flush-heartbeats" --http-method=POST \
+  --oidc-service-account-email="${SCHEDULER_SA}" \
+  --oidc-token-audience="${BACKEND_URL}/jobs/flush-heartbeats" || true
 
 gcloud scheduler jobs create http signage-snapshot-devices \
   --location="${REGION}" --schedule="0 * * * *" --time-zone="America/Mazatlan" \

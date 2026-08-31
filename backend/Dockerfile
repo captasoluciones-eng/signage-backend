@@ -21,7 +21,7 @@ RUN mkdir -p /app/static
 
 EXPOSE 8080
 
-# Cloud Run: min-instances=1, max-instances=10, concurrency=80 (see infra/).
+# Cloud Run: min-instances=0, max-instances=10, concurrency=80 (see infra/).
 # A single uvicorn worker per container is correct here because Cloud Run scales
 # containers horizontally and each container should host one event loop; the
 # in-process cache and heartbeat buffer are per-container singletons by design.

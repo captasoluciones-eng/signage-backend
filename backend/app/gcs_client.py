@@ -34,10 +34,12 @@ class GcsClient:
             content_type=content_type,
         )
         gcs_path = f"gs://{self._bucket_name}/{object_name}"
-        # Served via Cloud CDN fronting an HTTP(S) load balancer backed by this
-        # bucket (see infra/terraform/storage.tf) -- the CDN host is a stable
-        # custom/media domain mapped to that load balancer.
-        cdn_url = f"https://cdn.signage.example.com/{object_name}"
+        # Served directly from the bucket's public URL (see infra/terraform/
+        # storage.tf) -- no Cloud CDN / load balancer in front of it, which
+        # would add a fixed monthly cost not worth it at this scale. If that
+        # changes later, this is the only line that needs to point at a CDN
+        # domain instead.
+        cdn_url = f"https://storage.googleapis.com/{self._bucket_name}/{object_name}"
         return upload_url, gcs_path, cdn_url
 
 

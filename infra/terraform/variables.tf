@@ -38,8 +38,9 @@ variable "assets_bucket_name" {
 }
 
 variable "min_instances" {
-  type    = number
-  default = 1
+  description = "0 (default) scales Cloud Run to zero between polls, keeping this well within the free tier at ~100-device traffic volumes. Set to 1+ only if cold-start latency becomes a real problem -- that trades away most of the free-tier savings (see README cost section)."
+  type        = number
+  default     = 0
 }
 
 variable "max_instances" {
@@ -50,10 +51,4 @@ variable "max_instances" {
 variable "container_concurrency" {
   type    = number
   default = 80
-}
-
-variable "cdn_domain" {
-  description = "Custom domain mapped (via DNS + managed SSL cert) to the CDN load balancer that fronts the assets bucket."
-  type        = string
-  default     = "cdn.signage.example.com"
 }

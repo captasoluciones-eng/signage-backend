@@ -54,6 +54,32 @@ resource "google_cloud_scheduler_job" "snapshot_devices" {
   depends_on = [google_cloud_run_v2_service_iam_member.scheduler_invoker]
 }
 
+resource "google_cloud_scheduler_job" "flush_heartbeats" {
+  name             = "signage-flush-heartbeats"
+  project          = var.project_id
+  region           = var.region
+  description      = "Safety-net flush of the in-memory heartbeat buffer, bounding staleness while Cloud Run is scaled to zero between device polls."
+  schedule         = "* * * * *"
+  time_zone        = "America/Mazatlan"
+  attempt_deadline = "30s"
+
+  retry_config {
+    retry_count = 1
+  }
+
+  http_target {
+    http_method = "POST"
+    uri         = "${google_cloud_run_v2_service.backend.uri}/jobs/flush-heartbeats"
+
+    oidc_token {
+      service_account_email = google_service_account.scheduler.email
+      audience               = "${google_cloud_run_v2_service.backend.uri}/jobs/flush-heartbeats"
+    }
+  }
+
+  depends_on = [google_cloud_run_v2_service_iam_member.scheduler_invoker]
+}
+
 resource "google_cloud_scheduler_job" "purge_old_heartbeats" {
   name             = "signage-purge-old-heartbeats"
   project          = var.project_id
