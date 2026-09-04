@@ -76,7 +76,7 @@ resource "google_cloud_run_v2_service" "backend" {
 
       startup_probe {
         http_get {
-          path = "/healthz"
+          path = "/_internal/health"
         }
         initial_delay_seconds = 5
         period_seconds         = 5

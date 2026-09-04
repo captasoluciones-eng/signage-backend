@@ -71,8 +71,14 @@ app.include_router(admin.router)
 app.include_router(jobs.router)
 
 
-@app.get("/healthz")
+@app.get("/_internal/health")
 async def healthz():
+    # Deliberately NOT "/healthz": Cloud Run appears to intercept that exact
+    # path at the infrastructure level (reserved for its own probe wiring) --
+    # external requests to it never reach the container and get a generic
+    # Google error page instead of a real response, which is confusing to
+    # debug. Discovered while diagnosing Cloud Scheduler 401s in production;
+    # every other path (including this one) is unaffected.
     return {"status": "ok"}
 
 
