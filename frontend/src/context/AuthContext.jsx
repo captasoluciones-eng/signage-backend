@@ -2,9 +2,21 @@ import { createContext, useContext, useEffect, useState } from "react";
 import {
   onAuthStateChanged,
   signInWithPopup,
+  signInWithRedirect,
   signOut as firebaseSignOut,
 } from "firebase/auth";
 import { auth, googleProvider } from "../firebase";
+
+// Browsers/extensions that block popups (Safari's default popup policy,
+// strict privacy extensions, some in-app/embedded webviews) throw
+// auth/popup-blocked or auth/operation-not-supported-in-this-environment
+// from signInWithPopup. Falling back to a full-page redirect keeps sign-in
+// working there too; onAuthStateChanged below picks up the resulting
+// session once the redirect completes and the page reloads.
+const POPUP_FALLBACK_CODES = new Set([
+  "auth/popup-blocked",
+  "auth/operation-not-supported-in-this-environment",
+]);
 
 const AuthContext = createContext(null);
 
@@ -35,7 +47,17 @@ export function AuthProvider({ children }) {
     return () => clearInterval(interval);
   }, [user]);
 
-  const signIn = () => signInWithPopup(auth, googleProvider);
+  const signIn = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (err) {
+      if (POPUP_FALLBACK_CODES.has(err?.code)) {
+        await signInWithRedirect(auth, googleProvider);
+        return;
+      }
+      throw err;
+    }
+  };
   const signOut = () => firebaseSignOut(auth);
 
   return (
