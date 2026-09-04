@@ -25,15 +25,15 @@ expected AS (
   FROM per_device_day
 )
 SELECT
-  fecha,
-  deviceId,
+  e.fecha AS fecha,
+  e.deviceId AS deviceId,
   ANY_VALUE(ds.nombre) AS nombre,
-  groupId,
-  ROUND(LEAST(1.0, SAFE_DIVIDE(heartbeats_recibidos, heartbeats_esperados)) * 100, 2) AS uptimePct
+  e.groupId AS groupId,
+  ROUND(LEAST(1.0, SAFE_DIVIDE(e.heartbeats_recibidos, e.heartbeats_esperados)) * 100, 2) AS uptimePct
 FROM expected e
 LEFT JOIN `signage.device_snapshots` ds
   ON ds.deviceId = e.deviceId AND ds.fecha = e.fecha
-GROUP BY fecha, deviceId, groupId, heartbeats_recibidos, heartbeats_esperados;
+GROUP BY e.fecha, e.deviceId, e.groupId, e.heartbeats_recibidos, e.heartbeats_esperados;
 
 -- ---------------------------------------------------------------------
 -- v_disponibilidad_por_grupo: daily availability % aggregated by group,

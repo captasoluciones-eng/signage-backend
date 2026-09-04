@@ -103,12 +103,12 @@ resource "google_bigquery_table" "v_uptime_diario_por_dispositivo" {
         FROM per_device_day
       )
       SELECT
-        fecha, deviceId, ANY_VALUE(ds.nombre) AS nombre, groupId,
-        ROUND(LEAST(1.0, SAFE_DIVIDE(heartbeats_recibidos, heartbeats_esperados)) * 100, 2) AS uptimePct
+        e.fecha AS fecha, e.deviceId AS deviceId, ANY_VALUE(ds.nombre) AS nombre, e.groupId AS groupId,
+        ROUND(LEAST(1.0, SAFE_DIVIDE(e.heartbeats_recibidos, e.heartbeats_esperados)) * 100, 2) AS uptimePct
       FROM expected e
       LEFT JOIN `${var.project_id}.signage.device_snapshots` ds
         ON ds.deviceId = e.deviceId AND ds.fecha = e.fecha
-      GROUP BY fecha, deviceId, groupId, heartbeats_recibidos, heartbeats_esperados
+      GROUP BY e.fecha, e.deviceId, e.groupId, e.heartbeats_recibidos, e.heartbeats_esperados
     SQL
   }
 
