@@ -23,13 +23,6 @@
         { "fieldPath": "estado", "order": "ASCENDING" },
         { "fieldPath": "lastSeen", "order": "ASCENDING" }
       ]
-    },
-    {
-      "collectionGroup": "heartbeats",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        { "fieldPath": "ts", "order": "ASCENDING" }
-      ]
     }
   ],
   "fieldOverrides": []
