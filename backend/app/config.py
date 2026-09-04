@@ -31,7 +31,7 @@ class Settings(BaseSettings):
 
     # Firebase Auth (admin panel)
     firebase_project_id: str = "signage-prod"
-    admin_email_allowlist: str = "jesusbeltran@captasoluciones.com"
+    admin_email_allowlist: str = "captasoluciones@gmail.com"
 
     # Cloud Scheduler -> Cloud Run job endpoints, authenticated via OIDC ID tokens.
     scheduler_service_account_email: str = (

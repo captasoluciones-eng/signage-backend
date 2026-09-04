@@ -23,7 +23,7 @@ variable "backend_image" {
 variable "admin_email_allowlist" {
   description = "Comma-separated list of email addresses allowed into the admin panel."
   type        = string
-  default     = "jesusbeltran@captasoluciones.com"
+  default     = "captasoluciones@gmail.com"
 }
 
 variable "cors_allow_origins" {

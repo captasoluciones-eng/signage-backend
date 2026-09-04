@@ -27,7 +27,7 @@ service cloud.firestore {
       return isSignedIn()
         && request.auth.token.email_verified == true
         && request.auth.token.email in [
-          'jesusbeltran@captasoluciones.com'
+          'captasoluciones@gmail.com'
         ];
     }
 
