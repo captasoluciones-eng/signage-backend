@@ -6,6 +6,7 @@ import {
   signOut as firebaseSignOut,
 } from "firebase/auth";
 import { auth, googleProvider } from "../firebase";
+import { registerIdTokenGetter } from "../api/client";
 
 // Browsers/extensions that block popups (Safari's default popup policy,
 // strict privacy extensions, some in-app/embedded webviews) throw
@@ -26,6 +27,16 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      // Registered here, synchronously with the auth state itself, rather
+      // than from a separate effect keyed on `user`: a separate effect races
+      // Dashboard's own mount effect (child effects run before parent ones),
+      // so on the very first render after logging in, Dashboard's initial
+      // load() could fire before that effect updated the getter, sending a
+      // request with no token at all ("401 Missing bearer token"). Updating
+      // it right here means it's already correct before React even starts
+      // the render/effect cascade for this auth change.
+      registerIdTokenGetter(() => (firebaseUser ? firebaseUser.getIdToken() : Promise.resolve(null)));
+
       setUser(firebaseUser);
       if (firebaseUser) {
         const token = await firebaseUser.getIdToken();

@@ -3,7 +3,6 @@ import { Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { useAuth } from "./context/AuthContext";
-import { registerIdTokenGetter } from "./api/client";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Devices from "./pages/Devices";
@@ -16,11 +15,12 @@ import Reports from "./pages/Reports";
 export default function App() {
   const { user } = useAuth();
 
-  // Wire the API client to always fetch a fresh Firebase ID token, and log a
-  // lightweight session/tracking breadcrumb per the "every dashboard needs
-  // login/session/tracking" directive.
+  // Log a lightweight session/tracking breadcrumb per the "every dashboard
+  // needs login/session/tracking" directive. The API client's ID token
+  // getter is wired up in AuthContext itself, synchronously with the auth
+  // state change -- not here -- to avoid a mount-order race with pages that
+  // fetch data on mount (see AuthContext.jsx).
   useEffect(() => {
-    registerIdTokenGetter(() => (user ? user.getIdToken() : Promise.resolve(null)));
     if (user) {
       console.info("[signage-admin] session start", {
         uid: user.uid,
