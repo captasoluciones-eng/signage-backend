@@ -8,17 +8,44 @@ export function registerIdTokenGetter(getter) {
   currentIdTokenGetter = getter;
 }
 
+const RETRY_DELAYS_MS = [300, 800];
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function request(path, { method = "GET", body, auth = true, headers = {} } = {}) {
   const finalHeaders = { "Content-Type": "application/json", ...headers };
   if (auth && currentIdTokenGetter) {
     const token = await currentIdTokenGetter();
     if (token) finalHeaders["Authorization"] = `Bearer ${token}`;
   }
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method,
-    headers: finalHeaders,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+
+  // GET requests are safe to retry silently: a "Failed to fetch" here means
+  // the request never reached the server (a transient network blip, e.g.
+  // wifi reconnecting), not a server-side failure -- retrying a write isn't
+  // safe the same way, since the original attempt may have already gone
+  // through server-side before the response got lost.
+  const maxAttempts = method === "GET" ? RETRY_DELAYS_MS.length + 1 : 1;
+
+  let res;
+  let lastNetworkError;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (attempt > 0) await sleep(RETRY_DELAYS_MS[attempt - 1]);
+    try {
+      res = await fetch(`${BASE_URL}${path}`, {
+        method,
+        headers: finalHeaders,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      });
+      lastNetworkError = null;
+      break;
+    } catch (e) {
+      lastNetworkError = e;
+    }
+  }
+  if (lastNetworkError) throw lastNetworkError;
+
   if (res.status === 204) return null;
   const text = await res.text();
   const data = text ? JSON.parse(text) : null;
