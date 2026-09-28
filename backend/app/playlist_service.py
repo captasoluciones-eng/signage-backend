@@ -22,7 +22,7 @@ from app.schemas import (
     PlaylistResponse,
     SettingsModel,
 )
-from app.utils import compute_etag, is_item_vigente, now_utc_iso
+from app.utils import compute_etag, is_item_vigente, now_utc_iso, resolve_tz
 
 GLOBAL_DEFAULT_PLAYLIST_ID = "default"
 
@@ -39,12 +39,22 @@ async def _resolve_playlist_id(repo: FirestoreRepo, device: dict) -> Optional[st
     return GLOBAL_DEFAULT_PLAYLIST_ID
 
 
-def _filter_and_sort_items(raw_items: list[dict]) -> list[PlaylistItemModel]:
+def _filter_and_sort_items(
+    raw_items: list[dict], tz_name: Optional[str] = None
+) -> list[PlaylistItemModel]:
+    tz = resolve_tz(tz_name)
     items = []
     for it in raw_items:
         if not it.get("activo", True):
             continue
-        if not is_item_vigente(it.get("vigenciaDesde"), it.get("vigenciaHasta")):
+        if not is_item_vigente(
+            it.get("vigenciaDesde"),
+            it.get("vigenciaHasta"),
+            dias=it.get("dias"),
+            hora_inicio=it.get("horaInicio"),
+            hora_fin=it.get("horaFin"),
+            tz=tz,
+        ):
             continue
         items.append(
             PlaylistItemModel(
@@ -106,7 +116,9 @@ async def resolve_playlist_for_device(
         playlist_id = await _resolve_playlist_id(repo, device)
         playlist = await repo.get_playlist(playlist_id) if playlist_id else None
         if playlist:
-            items = _filter_and_sort_items(playlist.get("items", []))
+            items = _filter_and_sort_items(
+                playlist.get("items", []), (group or {}).get("timezone")
+            )
             updated_at = playlist.get("updatedAt", updated_at)
     # pendiente / deshabilitado -> items stays [] per contract.
 

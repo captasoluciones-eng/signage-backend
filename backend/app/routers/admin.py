@@ -36,6 +36,8 @@ from app.schemas import (
     PlaylistUpdateRequest,
     ProofOfPlayRow,
     ReassignGroupRequest,
+    RHAnnouncementModel,
+    RHAnnouncementUpsertRequest,
     SetDisabledRequest,
     SetPlaylistOverrideRequest,
     SignedUploadRequest,
@@ -324,6 +326,45 @@ async def list_assets(search: Optional[str] = None, repo: FirestoreRepo = Depend
     return await repo.list_assets(search=search)
 
 
+@router.delete("/assets/{asset_id}")
+async def delete_asset(
+    asset_id: str,
+    repo: FirestoreRepo = Depends(get_repo),
+    gcs: GcsClient = Depends(get_gcs_client),
+):
+    asset = await repo.get_asset(asset_id)
+    if asset is None:
+        raise HTTPException(status_code=404, detail="asset no encontrado")
+    gcs.delete_object(asset["gcsPath"])
+    await repo.delete_asset(asset_id)
+    return {"deleted": asset_id}
+
+
+# --------------------------------------------------------------------------
+# RH announcement (Content Studio "Convivencia / Anuncio RH" mode) -- one
+# current announcement per group; the tablero's RH screen reads this live
+# instead of RH designing a static slide by hand.
+# --------------------------------------------------------------------------
+@router.get("/rh-announcement/{group_id}", response_model=Optional[RHAnnouncementModel])
+async def get_rh_announcement(group_id: str, repo: FirestoreRepo = Depends(get_repo)):
+    return await repo.get_rh_announcement(group_id)
+
+
+@router.put("/rh-announcement/{group_id}", response_model=RHAnnouncementModel)
+async def upsert_rh_announcement(
+    group_id: str, body: RHAnnouncementUpsertRequest, repo: FirestoreRepo = Depends(get_repo)
+):
+    fields = body.model_dump()
+    fields["updatedAt"] = now_utc_iso()
+    return await repo.upsert_rh_announcement(group_id, fields)
+
+
+@router.delete("/rh-announcement/{group_id}")
+async def delete_rh_announcement(group_id: str, repo: FirestoreRepo = Depends(get_repo)):
+    await repo.delete_rh_announcement(group_id)
+    return {"deleted": group_id}
+
+
 # --------------------------------------------------------------------------
 # Reports (query BigQuery views -- see infra/bigquery/views.sql)
 # --------------------------------------------------------------------------
@@ -418,11 +459,16 @@ async def dashboard_summary(
     offline = sum(1 for d in devices if d.get("estado") == "activo" and not d.get("online"))
     pendiente = sum(1 for d in devices if d.get("estado") == "pendiente")
     deshabilitado = sum(1 for d in devices if d.get("estado") == "deshabilitado")
+    # El campo `ubicacion` del dispositivo hoy nunca se captura (siempre None),
+    # pero cada pantalla se asigna a un grupo que representa su sucursal. Cuando
+    # no hay ubicacion explicita, se usa el nombre del grupo como ubicacion para
+    # que la columna no salga vacia.
+    group_name = {g["groupId"]: g.get("nombre") for g in await repo.list_groups()}
     by_location = [
         {
             "deviceId": d["deviceId"],
             "nombre": d.get("nombre"),
-            "ubicacion": d.get("ubicacion"),
+            "ubicacion": d.get("ubicacion") or group_name.get(d.get("groupId")),
             "online": d.get("online"),
             "estado": d.get("estado"),
         }

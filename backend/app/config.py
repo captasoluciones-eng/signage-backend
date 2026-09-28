@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     # (set to empty string in production; OIDC verification is preferred there).
     scheduler_dev_shared_secret: str = ""
 
+    # Shared secret for the /sync endpoints (Sheet -> playlists automation).
+    # Empty = /sync disabled. On Cloud Run, set it from Secret Manager.
+    sync_api_key: str = ""
+
     # Cache / heartbeat tuning
     playlist_cache_ttl_seconds: int = 60
     heartbeat_flush_interval_seconds: int = 15

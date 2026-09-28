@@ -171,6 +171,14 @@ export default function Playlists() {
         </div>
 
         <p className="hint">Arrastra las filas por la columna izquierda para reordenar.</p>
+        <p className="hint">
+          Formato recomendado por tipo — <strong>imagen</strong>: 1920×1080 (16:9), JPG/PNG, máx. 5&nbsp;MB
+          (con escala "fill"/"cover" se recorta para llenar la pantalla: centra lo importante de la foto).
+          {" "}<strong>video</strong>: MP4 (H.264), 1920×1080. <strong>link</strong>: página web diseñada para
+          1920×1080 horizontal. No depende de las pulgadas de la TV: todas renderizan a pantalla completa
+          horizontal, así que lo que importa es la relación de aspecto (16:9) y la resolución del archivo, no
+          el tamaño físico de la pantalla.
+        </p>
 
         <table className="data-table playlist-editor">
           <thead>

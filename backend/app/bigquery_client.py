@@ -4,7 +4,9 @@ queries against the `signage` dataset (see infra/bigquery/*.sql for DDL).
 """
 from __future__ import annotations
 
+import datetime
 import logging
+from decimal import Decimal
 from typing import Any, Optional
 
 from google.cloud import bigquery
@@ -15,6 +17,24 @@ settings = get_settings()
 logger = logging.getLogger("signage.bigquery")
 
 MAX_BATCH = 500
+
+
+def _json_safe(value: Any) -> Any:
+    """Coerce BigQuery's native Python types into JSON/Pydantic-friendly ones.
+
+    BigQuery returns DATE -> datetime.date, TIMESTAMP -> datetime, NUMERIC ->
+    Decimal. The report response models declare these columns as str/float, so
+    without this coercion FastAPI raises ResponseValidationError while
+    serializing the response -- and because that happens after the CORS
+    middleware, the resulting 500 carries no CORS header and the browser only
+    sees "Failed to fetch". Dates/timestamps become ISO strings; Decimals become
+    floats.
+    """
+    if isinstance(value, (datetime.date, datetime.datetime)):
+        return value.isoformat()
+    if isinstance(value, Decimal):
+        return float(value)
+    return value
 
 
 class BigQueryClient:
@@ -47,7 +67,7 @@ class BigQueryClient:
     def query(self, sql: str, params: Optional[list[bigquery.ScalarQueryParameter]] = None):
         job_config = bigquery.QueryJobConfig(query_parameters=params or [])
         job = self._client.query(sql, job_config=job_config, location=settings.bq_location)
-        return [dict(row) for row in job.result()]
+        return [{k: _json_safe(v) for k, v in dict(row).items()} for row in job.result()]
 
 
 _bq_singleton: Optional[BigQueryClient] = None

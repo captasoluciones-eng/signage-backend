@@ -41,8 +41,9 @@ export default function Pairing() {
     <div>
       <h1>Vinculacion de dispositivo</h1>
       <p className="hint">
-        Ingresa el codigo de 6 digitos mostrado en la pantalla del TV recien instalado, asignale un
-        nombre y un grupo, y se emitira su llave de dispositivo (deviceKey).
+        Ingresa el codigo de 8 digitos mostrado en la pantalla del TV recien instalado, asignale un
+        nombre y un grupo. La TV toma su llave de dispositivo sola en su siguiente sincronizacion
+        (hasta 5 min) -- no hace falta copiar nada a mano.
       </p>
 
       <form className="panel form" onSubmit={submit}>
@@ -52,8 +53,8 @@ export default function Pairing() {
             className="input"
             value={pairingCode}
             onChange={(e) => setPairingCode(e.target.value)}
-            maxLength={6}
-            pattern="[0-9]{6}"
+            maxLength={8}
+            pattern="[0-9]{8}"
             required
           />
         </label>
@@ -84,13 +85,20 @@ export default function Pairing() {
           <p>
             <strong>Device ID:</strong> {result.deviceId}
           </p>
-          <p>
-            <strong>Device Key:</strong> <code>{result.deviceKey}</code>
-          </p>
           <p className="hint">
-            Esta llave no se vuelve a mostrar automaticamente; guardala si necesitas
-            reconfigurar el reproductor manualmente.
+            Listo, no hace falta hacer nada mas. La TV va a detectar la vinculacion sola en su
+            siguiente sincronizacion (hasta 5 min) y empezara a reproducir.
           </p>
+          <details>
+            <summary className="hint">Opciones avanzadas (solo si necesitas configurar el reproductor a mano)</summary>
+            <p>
+              <strong>Device Key:</strong> <code>{result.deviceKey}</code>
+            </p>
+            <p className="hint">
+              Esta llave no se vuelve a mostrar automaticamente. Solo hace falta si algun dia
+              necesitas reconfigurar el reproductor a mano (pantalla de Configuracion en la TV).
+            </p>
+          </details>
         </div>
       )}
     </div>

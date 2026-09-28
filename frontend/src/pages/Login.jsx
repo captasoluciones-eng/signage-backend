@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { IconLogo } from "../components/Icons";
 
 export default function Login() {
   const { user, loading, signIn } = useAuth();
@@ -25,7 +26,10 @@ export default function Login() {
   return (
     <div className="center-page login-page">
       <div className="login-card">
-        <h1>Signage Admin</h1>
+        <span className="brand-logo login-logo" aria-hidden="true">
+          <IconLogo width={26} height={26} />
+        </span>
+        <h1>CaptaVision</h1>
         <p>Panel de administracion de senaletica digital.</p>
         <button className="btn btn-primary" onClick={handleSignIn}>
           Iniciar sesion con Google

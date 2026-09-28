@@ -11,6 +11,7 @@ import Groups from "./pages/Groups";
 import Playlists from "./pages/Playlists";
 import Assets from "./pages/Assets";
 import Reports from "./pages/Reports";
+import ContentStudio from "./pages/ContentStudio";
 
 export default function App() {
   const { user } = useAuth();
@@ -41,6 +42,7 @@ export default function App() {
         }
       >
         <Route path="/" element={<Dashboard />} />
+        <Route path="/studio" element={<ContentStudio />} />
         <Route path="/devices" element={<Devices />} />
         <Route path="/pairing" element={<Pairing />} />
         <Route path="/groups" element={<Groups />} />

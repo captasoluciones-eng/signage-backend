@@ -22,6 +22,7 @@ COL_DEVICES = "devices"
 COL_GROUPS = "groups"
 COL_PLAYLISTS = "playlists"
 COL_ASSETS = "assets"
+COL_RH_ANNOUNCEMENTS = "rh_announcements"
 SUBCOL_HEARTBEATS = "heartbeats"
 
 
@@ -306,6 +307,40 @@ class FirestoreRepo:
                 continue
             results.append(data)
         return results
+
+    async def get_asset(self, asset_id: str) -> Optional[dict]:
+        snap = await self._client.collection(COL_ASSETS).document(asset_id).get()
+        if not snap.exists:
+            return None
+        data = snap.to_dict() or {}
+        data["assetId"] = snap.id
+        return data
+
+    async def delete_asset(self, asset_id: str) -> None:
+        await self._client.collection(COL_ASSETS).document(asset_id).delete()
+
+    # ------------------------------------------------------------------
+    # RH announcements (Content Studio "Convivencia / Anuncio RH" mode) --
+    # one current announcement per group, keyed by groupId.
+    # ------------------------------------------------------------------
+    async def get_rh_announcement(self, group_id: str) -> Optional[dict]:
+        snap = await self._client.collection(COL_RH_ANNOUNCEMENTS).document(group_id).get()
+        if not snap.exists:
+            return None
+        data = snap.to_dict() or {}
+        data["groupId"] = snap.id
+        return data
+
+    async def upsert_rh_announcement(self, group_id: str, fields: dict[str, Any]) -> dict:
+        await self._client.collection(COL_RH_ANNOUNCEMENTS).document(group_id).set(
+            fields, merge=True
+        )
+        fields = dict(fields)
+        fields["groupId"] = group_id
+        return fields
+
+    async def delete_rh_announcement(self, group_id: str) -> None:
+        await self._client.collection(COL_RH_ANNOUNCEMENTS).document(group_id).delete()
 
 
 # Process-wide singleton, reused across requests within a container.

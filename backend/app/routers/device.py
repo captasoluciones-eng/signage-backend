@@ -30,6 +30,9 @@ async def register_device(
         estado=device["estado"],
         pairingCode=device.get("pairingCode"),
         created=created,
+        # None hasta que el admin vincula el pairingCode en el panel; a
+        # partir de ahí, la app puede tomarla sola en su siguiente poll.
+        deviceKey=device.get("deviceKey"),
     )
 
 

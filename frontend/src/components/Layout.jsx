@@ -1,39 +1,65 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import {
+  IconDashboard,
+  IconScreen,
+  IconLink,
+  IconGroups,
+  IconPlaylist,
+  IconAssets,
+  IconReports,
+  IconLogout,
+  IconMagic,
+  IconLogo,
+} from "./Icons";
 
 const NAV_ITEMS = [
-  { to: "/", label: "Dashboard", end: true },
-  { to: "/devices", label: "Dispositivos" },
-  { to: "/pairing", label: "Vinculacion" },
-  { to: "/groups", label: "Grupos" },
-  { to: "/playlists", label: "Playlists" },
-  { to: "/assets", label: "Assets" },
-  { to: "/reports", label: "Reportes" },
+  { to: "/", label: "Inicio", end: true, Icon: IconDashboard },
+  { to: "/studio", label: "Crear contenido", Icon: IconMagic },
+  { to: "/devices", label: "Pantallas", Icon: IconScreen },
+  { to: "/pairing", label: "Vinculación", Icon: IconLink },
+  { to: "/groups", label: "Grupos", Icon: IconGroups },
+  { to: "/playlists", label: "Playlists", Icon: IconPlaylist },
+  { to: "/assets", label: "Recursos", Icon: IconAssets },
+  { to: "/reports", label: "Reportes", Icon: IconReports },
 ];
 
 export default function Layout() {
   const { user, signOut } = useAuth();
+  const inicial = (user?.email || "?").charAt(0);
 
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="brand">Signage Admin</div>
+        <div className="brand">
+          <span className="brand-logo" aria-hidden="true">
+            <IconLogo width={20} height={20} />
+          </span>
+          CaptaVision
+        </div>
         <nav>
-          {NAV_ITEMS.map((item) => (
+          {NAV_ITEMS.map(({ to, label, end, Icon }) => (
             <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
+              key={to}
+              to={to}
+              end={end}
               className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}
             >
-              {item.label}
+              <Icon width={18} height={18} />
+              {label}
             </NavLink>
           ))}
         </nav>
         <div className="sidebar-footer">
-          <div className="user-email">{user?.email}</div>
-          <button className="btn btn-ghost" onClick={signOut}>
-            Cerrar sesion
+          <div className="user-email">
+            <span className="user-avatar" aria-hidden="true">
+              {inicial}
+            </span>
+            {user?.email}
+          </div>
+          <button className="btn btn-ghost btn-sm" onClick={signOut}>
+            <IconLogout width={16} height={16} />
+            Cerrar sesión
           </button>
         </div>
       </aside>

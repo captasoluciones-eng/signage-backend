@@ -5,6 +5,7 @@ job-trigger endpoints.
 """
 from __future__ import annotations
 
+import hmac
 import logging
 from typing import Optional
 
@@ -138,3 +139,15 @@ async def verify_scheduler_request(
             status_code=403,
             detail="Token was not issued to the signage scheduler service account.",
         )
+
+
+# --------------------------------------------------------------------------
+# Sheet -> playlists automation: static shared secret in X-Sync-Key
+# --------------------------------------------------------------------------
+async def verify_sync_key(
+    x_sync_key: Optional[str] = Header(default=None, alias="X-Sync-Key"),
+) -> None:
+    if not settings.sync_api_key:
+        raise HTTPException(status_code=503, detail="Sync is not configured (SYNC_API_KEY).")
+    if not x_sync_key or not hmac.compare_digest(x_sync_key, settings.sync_api_key):
+        raise HTTPException(status_code=401, detail="Invalid X-Sync-Key.")

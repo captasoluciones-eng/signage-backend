@@ -6,7 +6,7 @@ Android TV app -- field names and shapes must NOT change.
 from __future__ import annotations
 
 from enum import Enum
-from typing import List, Optional
+from typing import Literal, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -54,6 +54,10 @@ class RegisterResponse(BaseModel):
     estado: DeviceEstado
     pairingCode: Optional[str] = None
     created: bool
+    # Solo se llena una vez que el admin vincula el pairingCode en el panel
+    # (estado == "activo"). Permite que la app auto-adopte su X-Device-Key
+    # sin que un humano tenga que copiarla del panel a la pantalla de Setup.
+    deviceKey: Optional[str] = None
 
 
 # --------------------------------------------------------------------------
@@ -198,6 +202,7 @@ class GroupModel(BaseModel):
     descripcion: Optional[str] = None
     settings: GroupSettingsModel
     playlistId: Optional[str] = None
+    timezone: Optional[str] = None  # IANA; default America/Mazatlan
 
 
 # --------------------------------------------------------------------------
@@ -213,6 +218,12 @@ class PlaylistItemAdmin(BaseModel):
     activo: bool = True
     vigenciaDesde: Optional[str] = None  # ISO date/datetime, evaluated in America/Mazatlan
     vigenciaHasta: Optional[str] = None
+    # Optional weekly/daily window, evaluated in the group's timezone:
+    # dias = "Todos" | "Lunes a viernes" | "Fines de semana"; horas "HH:MM".
+    dias: Optional[str] = None
+    horaInicio: Optional[str] = None
+    horaFin: Optional[str] = None
+    titulo: Optional[str] = None
 
 
 class PlaylistCreateRequest(BaseModel):
@@ -271,6 +282,31 @@ class AssetModel(BaseModel):
 
 
 # --------------------------------------------------------------------------
+# Admin: RH announcement (Content Studio "Convivencia / Anuncio RH" mode) --
+# one current announcement per group, read live by the tablero's RH screen
+# instead of RH designing a static slide by hand.
+# --------------------------------------------------------------------------
+class RHAnnouncementUpsertRequest(BaseModel):
+    titulo: str
+    fecha: str
+    lugar: str
+    fotoUrl: Optional[str] = None
+    ctaTexto: str = "¡LOS ESPERAMOS!"
+    activo: bool = True
+
+
+class RHAnnouncementModel(BaseModel):
+    groupId: str
+    titulo: str
+    fecha: str
+    lugar: str
+    fotoUrl: Optional[str] = None
+    ctaTexto: str = "¡LOS ESPERAMOS!"
+    activo: bool = True
+    updatedAt: str
+
+
+# --------------------------------------------------------------------------
 # Admin: reports
 # --------------------------------------------------------------------------
 class UptimeReportRow(BaseModel):
@@ -304,3 +340,44 @@ class ProofOfPlayRow(BaseModel):
     url: str
     durationSec: Optional[int] = None
     resultado: str
+
+
+# --------------------------------------------------------------------------
+# Sync (Sheet "CaptaVision · Contenido de Pantallas" -> playlists), called by
+# the automation with X-Sync-Key, not by the admin panel.
+# --------------------------------------------------------------------------
+class SyncGroup(BaseModel):
+    groupId: str
+    nombre: str
+    descripcion: Optional[str] = None
+    timezone: Optional[str] = None
+
+
+class SyncItem(BaseModel):
+    id: str  # Sheet row ID (e.g. "C-0005"); stored as "sheet-<id>"
+    # "comunicado" = text-only slide: the backend builds a `link` item to
+    # /public/comunicado from titulo + texto, so `url` may be empty.
+    type: Literal["imagen", "video", "link", "comunicado"]
+    url: str = ""
+    titulo: Optional[str] = None
+    texto: Optional[str] = None
+    grupos: List[str]  # groupIds, or ["*"] for every group
+    durationSec: Optional[int] = None
+    orden: int = 0
+    vigenciaDesde: Optional[str] = None
+    vigenciaHasta: Optional[str] = None
+    dias: Optional[str] = None
+    horaInicio: Optional[str] = None
+    horaFin: Optional[str] = None
+
+
+class SyncRequest(BaseModel):
+    grupos: List[SyncGroup] = Field(default_factory=list)
+    items: List[SyncItem] = Field(default_factory=list)
+
+
+class SyncResponse(BaseModel):
+    gruposCreados: List[str]
+    gruposActualizados: List[str]
+    playlistsActualizadas: List[str]
+    gruposDesconocidos: List[str]

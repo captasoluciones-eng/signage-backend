@@ -1,0 +1,8 @@
+
+# Variables de entorno locales (config Firebase pública + URL backend)
+.env
+.env.local
+
+# Local tooling caches
+.firebase/
+.claude/

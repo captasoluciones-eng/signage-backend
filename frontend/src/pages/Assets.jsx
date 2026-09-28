@@ -63,6 +63,17 @@ export default function Assets() {
     await load(value);
   }
 
+  async function onDelete(asset) {
+    if (!window.confirm(`Eliminar "${asset.nombre}"? Esto lo borra de Cloud Storage y no se puede deshacer.`)) return;
+    setError(null);
+    try {
+      await api.deleteAsset(asset.assetId);
+      setAssets((prev) => prev.filter((a) => a.assetId !== asset.assetId));
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
   async function onFileSelected(e) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -115,6 +126,13 @@ export default function Assets() {
       <h1>Assets</h1>
       {error && <div className="error-banner">Error: {error}</div>}
 
+      <p className="hint">
+        Formato recomendado — <strong>imagen</strong>: 1920×1080 (16:9), JPG/PNG, máx. 5&nbsp;MB.{" "}
+        <strong>video</strong>: MP4 (H.264), 1920×1080. Sube horizontal siempre: estas pantallas se ven
+        en TVs a pantalla completa, no importa el tamaño en pulgadas de la TV, sino la relación de aspecto
+        del archivo.
+      </p>
+
       <div className="toolbar">
         <input
           className="input"
@@ -155,6 +173,9 @@ export default function Assets() {
                 {a.cdnUrl}
               </a>
             </div>
+            <button className="btn btn-danger btn-sm" onClick={() => onDelete(a)}>
+              Eliminar
+            </button>
           </div>
         ))}
       </div>

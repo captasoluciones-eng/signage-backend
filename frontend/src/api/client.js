@@ -102,6 +102,14 @@ export const api = {
       body: { filename, contentType },
     }),
   createAsset: (payload) => request("/admin/assets", { method: "POST", body: payload }),
+  deleteAsset: (assetId) => request(`/admin/assets/${assetId}`, { method: "DELETE" }),
+
+  // RH announcement (Content Studio "Convivencia" mode)
+  getRHAnnouncement: (groupId) => request(`/admin/rh-announcement/${groupId}`),
+  upsertRHAnnouncement: (groupId, payload) =>
+    request(`/admin/rh-announcement/${groupId}`, { method: "PUT", body: payload }),
+  deleteRHAnnouncement: (groupId) =>
+    request(`/admin/rh-announcement/${groupId}`, { method: "DELETE" }),
 
   // Reports
   reportUptime: (params = {}) => {
