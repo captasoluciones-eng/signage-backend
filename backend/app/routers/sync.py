@@ -14,6 +14,7 @@ Auth: X-Sync-Key shared secret (settings.sync_api_key), see deps.verify_sync_key
 from __future__ import annotations
 
 import html
+from datetime import datetime
 from typing import Optional
 from urllib.parse import urlencode
 
@@ -42,6 +43,29 @@ TODAS = "*"
 
 def _is_sheet_item(item: dict) -> bool:
     return str(item.get("id", "")).startswith(SHEET_PREFIX)
+
+
+_DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+_MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
+          "septiembre", "octubre", "noviembre", "diciembre"]
+
+
+def fecha_larga(iso: Optional[str]) -> str:
+    """'2026-10-02' -> 'Viernes 2 de octubre de 2026' (texto del evento)."""
+    try:
+        d = datetime.strptime(str(iso), "%Y-%m-%d")
+    except (TypeError, ValueError):
+        return ""
+    return f"{_DIAS[d.weekday()].capitalize()} {d.day} de {_MESES[d.month - 1]} de {d.year}"
+
+
+def hora_ampm(hhmm: Optional[str]) -> str:
+    try:
+        h, m = (int(x) for x in str(hhmm).split(":")[:2])
+    except (TypeError, ValueError):
+        return ""
+    sufijo = "a.m." if h < 12 else "p.m."
+    return f"{(h % 12) or 12}:{m:02d} {sufijo}"
 
 
 def comunicado_url(base_url: str, titulo: str, texto: str) -> str:
@@ -100,6 +124,9 @@ def plan_sync(
                     "titulo": it.titulo,
                     "texto": it.texto,
                     "soloPantalla": gid in con_pantalla and not it.esPantalla,
+                    **({"evento": {"fotoUrl": it.fotoUrl, "fecha": it.eventoFecha,
+                                   "hora": it.eventoHora, "lugar": it.eventoLugar, "cta": it.eventoCta}}
+                       if it.esEvento else {}),
                     "durationSec": it.durationSec,
                     "scale": "fill",
                     "orden": it.orden,
@@ -163,7 +190,13 @@ async def sync_contenido(
 ):
     base_url = str(request.base_url)
     for it in body.items:
-        if it.type == "comunicado":
+        if it.type == "evento":
+            detalle = " · ".join(x for x in [fecha_larga(it.eventoFecha), hora_ampm(it.eventoHora), it.eventoLugar] if x)
+            texto = "\n".join(x for x in [it.texto, detalle] if x)
+            it.url = comunicado_url(base_url, it.titulo or "", texto)
+            it.type = "link"
+            it.esEvento = True
+        elif it.type == "comunicado":
             it.url = comunicado_url(base_url, it.titulo or "", it.texto or "")
             it.type = "link"
 
@@ -242,7 +275,8 @@ async def pantalla(group_id: str, repo: FirestoreRepo = Depends(get_repo)):
             es_comunicado = it.get("type") == "link" and "/public/comunicado" in str(it.get("url", ""))
             contenido.append({
                 "id": it["id"],
-                "tipo": "comunicado" if es_comunicado else it.get("type"),
+                "tipo": "evento" if it.get("evento") else "comunicado" if es_comunicado else it.get("type"),
+                "evento": it.get("evento"),
                 "url": it.get("url"),
                 "titulo": it.get("titulo"),
                 "texto": it.get("texto"),

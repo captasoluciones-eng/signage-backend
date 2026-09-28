@@ -361,10 +361,18 @@ class SyncItem(BaseModel):
     id: str  # Sheet row ID (e.g. "C-0005"); stored as "sheet-<id>"
     # "comunicado" = text-only slide: the backend builds a `link` item to
     # /public/comunicado from titulo + texto, so `url` may be empty.
-    type: Literal["imagen", "video", "link", "comunicado"]
+    # "evento" = RH event card (photo + countdown + date/time/place) inside the
+    # KPI screen; standalone devices get it as a comunicado slide.
+    type: Literal["imagen", "video", "link", "comunicado", "evento"]
     url: str = ""
     titulo: Optional[str] = None
     texto: Optional[str] = None
+    fotoUrl: Optional[str] = None
+    eventoFecha: Optional[str] = None  # YYYY-MM-DD
+    eventoHora: Optional[str] = None   # HH:MM
+    eventoLugar: Optional[str] = None
+    eventoCta: Optional[str] = None    # closing line, e.g. "¡Los esperamos!"
+    esEvento: bool = False  # set by the backend when it turns an "evento" into a link item
     grupos: List[str]  # groupIds, or ["*"] for every group
     durationSec: Optional[int] = None
     orden: int = 0

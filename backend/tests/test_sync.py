@@ -140,3 +140,10 @@ def test_group_with_kpi_screen_plays_rh_items_inside_it():
     # A group without a KPI screen still plays the photo on its own.
     rh = plan["write_playlists"]["pl-sheet-rh"]["items"]
     assert [(i["id"], i["soloPantalla"]) for i in rh] == [("sheet-C-8", False)]
+
+
+def test_evento_helpers():
+    from app.routers.sync import fecha_larga, hora_ampm
+    assert fecha_larga("2026-10-02") == "Viernes 2 de octubre de 2026"
+    assert hora_ampm("14:00") == "2:00 p.m." and hora_ampm("09:30") == "9:30 a.m."
+    assert fecha_larga(None) == "" and hora_ampm("") == ""
