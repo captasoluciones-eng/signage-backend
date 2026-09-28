@@ -70,12 +70,12 @@ resource "google_cloud_run_v2_service" "backend" {
         value = var.cors_allow_origins
       }
       env {
-        name  = "SYNC_API_KEY"
-        value = var.sync_api_key # Sheet -> playlists automation (X-Sync-Key); empty disables /sync
-      }
-      env {
         name  = "SCHEDULER_DEV_SHARED_SECRET"
         value = "" # never set in production; OIDC verification is used instead
+      }
+      env {
+        name  = "SYNC_API_KEY"
+        value = var.sync_api_key # Sheet -> playlists automation (X-Sync-Key); empty disables /sync
       }
 
       startup_probe {
