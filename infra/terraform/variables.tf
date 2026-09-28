@@ -52,3 +52,10 @@ variable "container_concurrency" {
   type    = number
   default = 80
 }
+
+variable "sync_api_key" {
+  description = "Shared secret for the /sync endpoints (X-Sync-Key), used by the Apps Script that syncs the 'CaptaVision · Contenido de Pantallas' Sheet. Keep it only in terraform.tfvars, never in git. Empty disables /sync."
+  type        = string
+  default     = ""
+  sensitive   = true
+}

@@ -8,3 +8,6 @@ assets_bucket_name     = "signage-prod-assets"
 min_instances          = 0
 max_instances          = 10
 container_concurrency  = 80
+
+# Shared secret for /sync (generate with: openssl rand -hex 24). Never commit the real value.
+sync_api_key = ""
