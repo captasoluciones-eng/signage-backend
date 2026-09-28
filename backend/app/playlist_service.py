@@ -45,7 +45,7 @@ def _filter_and_sort_items(
     tz = resolve_tz(tz_name)
     items = []
     for it in raw_items:
-        if not it.get("activo", True):
+        if not it.get("activo", True) or it.get("soloPantalla"):
             continue
         if not is_item_vigente(
             it.get("vigenciaDesde"),

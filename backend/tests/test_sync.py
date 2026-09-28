@@ -123,3 +123,20 @@ def test_timezone_is_respected():
     enero = datetime(2027, 1, 11, 10, 0, tzinfo=MZT)
     assert is_item_vigente(None, None, hora_inicio="09:30", tz=tj, now=enero) is False
     assert is_item_vigente(None, None, hora_inicio="09:30", tz=MZT, now=enero) is True
+
+
+def test_group_with_kpi_screen_plays_rh_items_inside_it():
+    groups = {"culiacan": {"groupId": "culiacan", "nombre": "Culiacán", "playlistId": None},
+              "rh": {"groupId": "rh", "nombre": "Oficina RH", "playlistId": None}}
+    items = [
+        {"id": "KPI-culiacan", "type": "link", "url": "https://k/pantalla/?g=culiacan",
+         "grupos": ["culiacan"], "esPantalla": True},
+        _item("C-8", ["*"]),
+    ]
+    plan = plan_sync(_req(items=items), groups, {}, BASE)
+    cul = {i["id"]: i for i in plan["write_playlists"]["pl-sheet-culiacan"]["items"]}
+    assert cul["sheet-KPI-culiacan"]["soloPantalla"] is False
+    assert cul["sheet-C-8"]["soloPantalla"] is True
+    # A group without a KPI screen still plays the photo on its own.
+    rh = plan["write_playlists"]["pl-sheet-rh"]["items"]
+    assert [(i["id"], i["soloPantalla"]) for i in rh] == [("sheet-C-8", False)]

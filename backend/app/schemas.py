@@ -224,6 +224,10 @@ class PlaylistItemAdmin(BaseModel):
     horaInicio: Optional[str] = None
     horaFin: Optional[str] = None
     titulo: Optional[str] = None
+    # Sheet items shown inside the KPI screen (/public/pantalla) instead of
+    # as standalone playlist items; devices skip them.
+    texto: Optional[str] = None
+    soloPantalla: bool = False
 
 
 class PlaylistCreateRequest(BaseModel):
@@ -369,11 +373,17 @@ class SyncItem(BaseModel):
     dias: Optional[str] = None
     horaInicio: Optional[str] = None
     horaFin: Optional[str] = None
+    # The per-sucursal KPI screen. When a group has one, the group's other
+    # Sheet items are played inside it (soloPantalla) rather than on their own.
+    esPantalla: bool = False
 
 
 class SyncRequest(BaseModel):
     grupos: List[SyncGroup] = Field(default_factory=list)
     items: List[SyncItem] = Field(default_factory=list)
+    # "Diseño Pantallas" tab: screen order, timings, KPIs, messages. Stored
+    # as-is and served to the KPI screen; None = leave the stored one alone.
+    pantalla: Optional[dict] = None
 
 
 class SyncResponse(BaseModel):

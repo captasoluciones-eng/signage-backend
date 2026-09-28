@@ -18,7 +18,7 @@ from typing import Optional
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from app.cache import playlist_cache
 from app.deps import verify_sync_key
@@ -31,7 +31,7 @@ from app.schemas import (
     SyncRequest,
     SyncResponse,
 )
-from app.utils import now_utc_iso
+from app.utils import is_item_vigente, now_utc_iso, resolve_tz
 
 router = APIRouter(prefix="/sync", tags=["sync"], dependencies=[Depends(verify_sync_key)])
 comunicado_router = APIRouter(prefix="/public", tags=["public"])
@@ -81,18 +81,25 @@ def plan_sync(
     # Sheet items per target group.
     per_group: dict[str, list[dict]] = {gid: [] for gid in all_groups}
     unknown: set[str] = set()
+    targets_of = {}
     for it in req.items:
         targets = set(all_groups) if TODAS in it.grupos else set(it.grupos)
         unknown |= targets - set(all_groups)
+        targets_of[it.id] = targets & set(all_groups)
+    # Groups that have a KPI screen play their other Sheet items inside it.
+    con_pantalla = {gid for it in req.items if it.esPantalla for gid in targets_of[it.id]}
+    for it in req.items:
         if it.type == "link" and not it.url:
             continue
-        for gid in targets & set(all_groups):
+        for gid in targets_of[it.id]:
             per_group[gid].append(
                 {
                     "id": f"{SHEET_PREFIX}{it.id}",
                     "type": it.type,
                     "url": it.url,
                     "titulo": it.titulo,
+                    "texto": it.texto,
+                    "soloPantalla": gid in con_pantalla and not it.esPantalla,
                     "durationSec": it.durationSec,
                     "scale": "fill",
                     "orden": it.orden,
@@ -175,6 +182,13 @@ async def sync_contenido(
         else:
             await repo.create_playlist(pid, fields)
 
+    if body.pantalla is not None:
+        ref = repo.client.collection("config").document("pantalla")
+        snap = await ref.get()
+        actual = (snap.to_dict() or {}) if snap.exists else {}
+        if actual.get("config") != body.pantalla:
+            await ref.set({"config": body.pantalla, "updatedAt": now_utc_iso()})
+
     touched = set(plan["create_groups"]) | set(plan["update_groups"]) | {
         pl["groupId"] for pl in plan["write_playlists"].values()
     }
@@ -200,6 +214,51 @@ async def sync_upload_url(body: SignedUploadRequest, gcs: GcsClient = Depends(ge
         gcsPath=gcs_path,
         cdnUrl=cdn_url,
         headers={"Content-Type": body.contentType},
+    )
+
+
+# --------------------------------------------------------------------------
+# Data for the per-sucursal KPI screen (kiosko.../pantalla/?g=<groupId>):
+# the "Diseño Pantallas" config plus the group's RH items that are currently
+# vigentes, which the screen interleaves with the indicator screens.
+# --------------------------------------------------------------------------
+@comunicado_router.get("/pantalla/{group_id}")
+async def pantalla(group_id: str, repo: FirestoreRepo = Depends(get_repo)):
+    snap = await repo.client.collection("config").document("pantalla").get()
+    config = ((snap.to_dict() or {}).get("config")) if snap.exists else None
+
+    group = await repo.get_group(group_id)
+    contenido: list[dict] = []
+    if group and group.get("playlistId"):
+        playlist = await repo.get_playlist(group["playlistId"]) or {}
+        tz = resolve_tz(group.get("timezone"))
+        for it in playlist.get("items", []):
+            if not it.get("soloPantalla") or not it.get("activo", True):
+                continue
+            if not is_item_vigente(it.get("vigenciaDesde"), it.get("vigenciaHasta"),
+                                   dias=it.get("dias"), hora_inicio=it.get("horaInicio"),
+                                   hora_fin=it.get("horaFin"), tz=tz):
+                continue
+            es_comunicado = it.get("type") == "link" and "/public/comunicado" in str(it.get("url", ""))
+            contenido.append({
+                "id": it["id"],
+                "tipo": "comunicado" if es_comunicado else it.get("type"),
+                "url": it.get("url"),
+                "titulo": it.get("titulo"),
+                "texto": it.get("texto"),
+                "durationSec": it.get("durationSec"),
+                "orden": it.get("orden", 0),
+            })
+        contenido.sort(key=lambda i: (i["orden"], i["id"]))
+
+    anuncio = await repo.get_rh_announcement(group_id) if group else None
+    if anuncio and not anuncio.get("activo", True):
+        anuncio = None
+
+    return JSONResponse(
+        {"groupId": group_id, "existe": group is not None, "config": config,
+         "contenido": contenido, "anuncio": anuncio, "generado": now_utc_iso()},
+        headers={"Cache-Control": "public, max-age=60"},
     )
 
 
