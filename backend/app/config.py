@@ -45,6 +45,17 @@ class Settings(BaseSettings):
     # Empty = /sync disabled. On Cloud Run, set it from Secret Manager.
     sync_api_key: str = ""
 
+    # Web app de Apps Script del Sheet "CaptaVision · Contenido de Pantallas"
+    # (Panel.gs: doPost). El panel publica/lista/edita en el Sheet a través de
+    # ella, firmando con sync_api_key. Vacío = sección de RH del panel apagada.
+    apps_script_panel_url: str = ""
+
+    # Pantalla de indicadores de las sucursales y el token de su API (Tablero Kiosco).
+    # El backend arma el link de cada sucursal para la Vista previa del panel, así el
+    # token no queda en el código del panel (que es público).
+    pantalla_url: str = "https://kiosko.bts-captasoluciones.site/pantalla/"
+    kiosco_token: str = ""
+
     # Cache / heartbeat tuning
     playlist_cache_ttl_seconds: int = 60
     heartbeat_flush_interval_seconds: int = 15

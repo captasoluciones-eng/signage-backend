@@ -1,12 +1,17 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import {
   onAuthStateChanged,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
   signInWithPopup,
   signInWithRedirect,
   signOut as firebaseSignOut,
 } from "firebase/auth";
 import { auth, googleProvider } from "../firebase";
-import { registerIdTokenGetter } from "../api/client";
+import { api, registerIdTokenGetter } from "../api/client";
+
+// Correos de Firebase (crear/restablecer contraseña) en español.
+auth.languageCode = "es";
 
 // Browsers/extensions that block popups (Safari's default popup policy,
 // strict privacy extensions, some in-app/embedded webviews) throw
@@ -24,6 +29,9 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(undefined); // undefined = loading, null = signed out
   const [idToken, setIdToken] = useState(null);
+  // Rol del usuario en el panel (lo decide el backend: /me). undefined = cargando,
+  // null = la cuenta entró a Firebase pero no tiene acceso al panel.
+  const [perfil, setPerfil] = useState(undefined);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -39,10 +47,17 @@ export function AuthProvider({ children }) {
 
       setUser(firebaseUser);
       if (firebaseUser) {
+        setPerfil(undefined);
         const token = await firebaseUser.getIdToken();
         setIdToken(token);
+        try {
+          setPerfil(await api.me());
+        } catch {
+          setPerfil(null);
+        }
       } else {
         setIdToken(null);
+        setPerfil(undefined);
       }
     });
     return unsub;
@@ -70,9 +85,20 @@ export function AuthProvider({ children }) {
     }
   };
   const signOut = () => firebaseSignOut(auth);
+  // Usuarios dados de alta en "Usuarios" (p. ej. cuentas de Outlook).
+  const signInEmail = (email, password) => signInWithEmailAndPassword(auth, email.trim(), password);
+  // Sirve para "olvidé mi contraseña" y para la primera vez (crear contraseña).
+  const enviarCorreoContrasena = (email) =>
+    sendPasswordResetEmail(auth, email.trim(), { url: window.location.origin + "/login" });
 
+  const rol = perfil?.rol || null;
   return (
-    <AuthContext.Provider value={{ user, idToken, signIn, signOut, loading: user === undefined }}>
+    <AuthContext.Provider
+      value={{
+        user, idToken, perfil, rol, signIn, signInEmail, enviarCorreoContrasena, signOut,
+        loading: user === undefined || (user && perfil === undefined),
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

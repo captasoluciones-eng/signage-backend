@@ -11,7 +11,14 @@ import Groups from "./pages/Groups";
 import Playlists from "./pages/Playlists";
 import Assets from "./pages/Assets";
 import Reports from "./pages/Reports";
-import ContentStudio from "./pages/ContentStudio";
+import Usuarios from "./pages/Usuarios";
+import Publicar from "./pages/rh/Publicar";
+import Publicaciones from "./pages/rh/Publicaciones";
+import VistaPrevia from "./pages/rh/VistaPrevia";
+
+// Páginas de administración: solo rol admin. RH y "solo consulta" ven su sección.
+const soloAdmin = (el) => <ProtectedRoute roles={["admin"]}>{el}</ProtectedRoute>;
+const publican = (el) => <ProtectedRoute roles={["admin", "rh"]}>{el}</ProtectedRoute>;
 
 export default function App() {
   const { user } = useAuth();
@@ -41,14 +48,17 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/studio" element={<ContentStudio />} />
-        <Route path="/devices" element={<Devices />} />
-        <Route path="/pairing" element={<Pairing />} />
-        <Route path="/groups" element={<Groups />} />
-        <Route path="/playlists" element={<Playlists />} />
-        <Route path="/assets" element={<Assets />} />
-        <Route path="/reports" element={<Reports />} />
+        <Route path="/" element={soloAdmin(<Dashboard />)} />
+        <Route path="/devices" element={soloAdmin(<Devices />)} />
+        <Route path="/pairing" element={soloAdmin(<Pairing />)} />
+        <Route path="/groups" element={soloAdmin(<Groups />)} />
+        <Route path="/playlists" element={soloAdmin(<Playlists />)} />
+        <Route path="/assets" element={soloAdmin(<Assets />)} />
+        <Route path="/reports" element={soloAdmin(<Reports />)} />
+        <Route path="/usuarios" element={soloAdmin(<Usuarios />)} />
+        <Route path="/rh/publicar" element={publican(<Publicar />)} />
+        <Route path="/rh/publicaciones" element={<Publicaciones />} />
+        <Route path="/rh/vista-previa" element={<VistaPrevia />} />
       </Route>
     </Routes>
   );

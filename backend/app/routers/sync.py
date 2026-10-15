@@ -22,6 +22,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from app.cache import playlist_cache
+from app.config import get_settings
 from app.deps import verify_sync_key
 from app.firestore_repo import FirestoreRepo, get_repo
 from app.gcs_client import GcsClient, get_gcs_client
@@ -33,6 +34,8 @@ from app.schemas import (
     SyncResponse,
 )
 from app.utils import is_item_vigente, now_utc_iso, resolve_tz
+
+settings = get_settings()
 
 router = APIRouter(prefix="/sync", tags=["sync"], dependencies=[Depends(verify_sync_key)])
 comunicado_router = APIRouter(prefix="/public", tags=["public"])
@@ -68,8 +71,17 @@ def hora_ampm(hhmm: Optional[str]) -> str:
     return f"{(h % 12) or 12}:{m:02d} {sufijo}"
 
 
-def comunicado_url(base_url: str, titulo: str, texto: str) -> str:
-    return f"{base_url.rstrip('/')}/public/comunicado?{urlencode({'t': titulo, 'm': texto})}"
+def comunicado_url(base_url: str, titulo: str, texto: str, fondo: Optional[str] = None) -> str:
+    params = {"t": titulo, "m": texto}
+    if fondo:
+        params["f"] = fondo
+    return f"{base_url.rstrip('/')}/public/comunicado?{urlencode(params)}"
+
+
+def fondo_valido(url: Optional[str]) -> Optional[str]:
+    """Solo imágenes de nuestro bucket (lo que sube el panel); cualquier otra cosa se ignora."""
+    u = (url or "").strip()
+    return u if u.startswith(f"https://storage.googleapis.com/{settings.gcs_assets_bucket}/") and '"' not in u else None
 
 
 def plan_sync(
@@ -124,6 +136,7 @@ def plan_sync(
                     "titulo": it.titulo,
                     "texto": it.texto,
                     "soloPantalla": gid in con_pantalla and not it.esPantalla,
+                    **({"fondoUrl": it.fondoUrl} if it.fondoUrl else {}),
                     **({"evento": {"fotoUrl": it.fotoUrl, "fecha": it.eventoFecha,
                                    "hora": it.eventoHora, "lugar": it.eventoLugar, "cta": it.eventoCta}}
                        if it.esEvento else {}),
@@ -190,14 +203,15 @@ async def sync_contenido(
 ):
     base_url = str(request.base_url)
     for it in body.items:
+        it.fondoUrl = fondo_valido(it.fondoUrl)
         if it.type == "evento":
             detalle = " · ".join(x for x in [fecha_larga(it.eventoFecha), hora_ampm(it.eventoHora), it.eventoLugar] if x)
             texto = "\n".join(x for x in [it.texto, detalle] if x)
-            it.url = comunicado_url(base_url, it.titulo or "", texto)
+            it.url = comunicado_url(base_url, it.titulo or "", texto, it.fondoUrl)
             it.type = "link"
             it.esEvento = True
         elif it.type == "comunicado":
-            it.url = comunicado_url(base_url, it.titulo or "", it.texto or "")
+            it.url = comunicado_url(base_url, it.titulo or "", it.texto or "", it.fondoUrl)
             it.type = "link"
 
     groups = {g["groupId"]: g for g in await repo.list_groups()}
@@ -280,6 +294,7 @@ async def pantalla(group_id: str, repo: FirestoreRepo = Depends(get_repo)):
                 "url": it.get("url"),
                 "titulo": it.get("titulo"),
                 "texto": it.get("texto"),
+                "fondoUrl": it.get("fondoUrl"),
                 "durationSec": it.get("durationSec"),
                 "orden": it.get("orden", 0),
             })
@@ -314,8 +329,13 @@ _COMUNICADO_HTML = """<!DOCTYPE html>
   p{{font-size:3.2vw;line-height:1.35;margin:0;opacity:.95;white-space:pre-line;}}
   .pie{{position:fixed;bottom:3vw;left:8vw;right:8vw;display:flex;justify-content:space-between;
         font-size:1.6vw;opacity:.7;}}
+  /* Con fondo elegido por RH: la imagen ocupa todo y el texto va en una franja semitransparente. */
+  body.con-fondo{{background:#0b1626 url("{fondo}") center/cover no-repeat;}}
+  body.con-fondo .box{{width:76vw;background:rgba(10,24,42,.74);padding:3.2vw 4vw;border-radius:2vw;
+        box-shadow:0 2vw 5vw rgba(0,0,0,.35);}}
+  body.con-fondo .pie{{opacity:.9;text-shadow:0 1px 4px rgba(0,0,0,.8);}}
 </style></head>
-<body><div class="box">
+<body class="{clase}"><div class="box">
   <span class="tag">Comunicado</span>
   <h1>{titulo}</h1>
   <p>{texto}</p>
@@ -325,8 +345,12 @@ _COMUNICADO_HTML = """<!DOCTYPE html>
 
 
 @comunicado_router.get("/comunicado", response_class=HTMLResponse)
-async def comunicado(t: str = Query("", max_length=200), m: str = Query("", max_length=1000)):
+async def comunicado(
+    t: str = Query("", max_length=200), m: str = Query("", max_length=1000), f: str = Query("", max_length=500)
+):
+    fondo = fondo_valido(f)
     return HTMLResponse(
-        _COMUNICADO_HTML.format(titulo=html.escape(t), texto=html.escape(m)),
+        _COMUNICADO_HTML.format(titulo=html.escape(t), texto=html.escape(m),
+                                fondo=html.escape(fondo or ""), clase="con-fondo" if fondo else ""),
         headers={"Cache-Control": "public, max-age=3600"},
     )

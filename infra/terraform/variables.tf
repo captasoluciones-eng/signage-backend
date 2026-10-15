@@ -53,6 +53,19 @@ variable "container_concurrency" {
   default = 80
 }
 
+variable "kiosco_token" {
+  description = "Token del API del Tablero Kiosco (Apps Script). El backend arma con él el link de la pantalla de cada sucursal para la Vista previa del panel. Solo en terraform.tfvars."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "apps_script_panel_url" {
+  description = "URL /exec de la web app de Apps Script del Sheet 'CaptaVision · Contenido de Pantallas' (Panel.gs, doPost). La sección de RH del panel publica/lista/edita en el Sheet a través de ella. Vacío apaga la sección."
+  type        = string
+  default     = ""
+}
+
 variable "sync_api_key" {
   description = "Shared secret for the /sync endpoints (X-Sync-Key), used by the Apps Script that syncs the 'CaptaVision · Contenido de Pantallas' Sheet. Keep it only in terraform.tfvars, never in git. Empty disables /sync."
   type        = string

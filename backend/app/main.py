@@ -26,7 +26,7 @@ from app.cache import playlist_cache
 from app.config import get_settings
 from app.firestore_repo import get_repo
 from app.heartbeat_buffer import HeartbeatBuffer
-from app.routers import admin, device, jobs, public, sync
+from app.routers import admin, device, jobs, panel, public, sync
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("signage.main")
@@ -72,6 +72,9 @@ app.include_router(jobs.router)
 app.include_router(public.router)
 app.include_router(sync.router)
 app.include_router(sync.comunicado_router)
+app.include_router(panel.me_router)
+app.include_router(panel.rh_router)
+app.include_router(panel.usuarios_router)
 
 
 @app.get("/_internal/health")
