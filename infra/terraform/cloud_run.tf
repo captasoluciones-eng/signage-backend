@@ -77,6 +77,14 @@ resource "google_cloud_run_v2_service" "backend" {
         name  = "SYNC_API_KEY"
         value = var.sync_api_key # Sheet -> playlists automation (X-Sync-Key); empty disables /sync
       }
+      env {
+        name  = "APPS_SCRIPT_PANEL_URL"
+        value = var.apps_script_panel_url # web app del Sheet (Panel.gs): la sección de RH del panel publica ahí
+      }
+      env {
+        name  = "KIOSCO_TOKEN"
+        value = var.kiosco_token # para armar el link de la pantalla de cada sucursal (Vista previa)
+      }
 
       startup_probe {
         http_get {

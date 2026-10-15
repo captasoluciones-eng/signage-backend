@@ -228,6 +228,7 @@ class PlaylistItemAdmin(BaseModel):
     # as standalone playlist items; devices skip them.
     texto: Optional[str] = None
     soloPantalla: bool = False
+    fondoUrl: Optional[str] = None
 
 
 class PlaylistCreateRequest(BaseModel):
@@ -372,6 +373,8 @@ class SyncItem(BaseModel):
     eventoHora: Optional[str] = None   # HH:MM
     eventoLugar: Optional[str] = None
     eventoCta: Optional[str] = None    # closing line, e.g. "¡Los esperamos!"
+    # Comunicado / Evento: imagen de fondo elegida por RH (nuestro bucket); vacío = diseño normal.
+    fondoUrl: Optional[str] = None
     esEvento: bool = False  # set by the backend when it turns an "evento" into a link item
     grupos: List[str]  # groupIds, or ["*"] for every group
     durationSec: Optional[int] = None
@@ -399,3 +402,84 @@ class SyncResponse(BaseModel):
     gruposActualizados: List[str]
     playlistsActualizadas: List[str]
     gruposDesconocidos: List[str]
+
+
+# --------------------------------------------------------------------------
+# Panel: usuarios con rol y sección de RH (publica en el Sheet vía Apps Script)
+# --------------------------------------------------------------------------
+class MeResponse(BaseModel):
+    email: str
+    rol: Literal["admin", "rh", "lectura"]
+    nombre: str = ""
+    superadmin: bool = False
+
+
+class PanelUserModel(BaseModel):
+    email: str
+    nombre: str = ""
+    rol: Literal["admin", "rh", "lectura"]
+    activo: bool = True
+    superadmin: bool = False  # viene de ADMIN_EMAIL_ALLOWLIST: no se edita desde el panel
+    creado: Optional[str] = None
+    creadoPor: Optional[str] = None
+
+
+class PanelUserCreateRequest(BaseModel):
+    email: str = Field(min_length=5, max_length=200, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+    nombre: str = Field(default="", max_length=120)
+    rol: Literal["admin", "rh", "lectura"] = "rh"
+
+
+class PanelUserUpdateRequest(BaseModel):
+    nombre: Optional[str] = Field(default=None, max_length=120)
+    rol: Optional[Literal["admin", "rh", "lectura"]] = None
+    activo: Optional[bool] = None
+
+
+class PanelUserCreateResponse(BaseModel):
+    usuario: PanelUserModel
+    cuentaNueva: bool  # True = se creó la cuenta de acceso; el panel manda el correo para crear contraseña
+
+
+class RhPublicacionRequest(BaseModel):
+    tipo: Literal["Foto", "Video", "Comunicado", "Evento"]
+    titulo: str = Field(min_length=1, max_length=200)
+    texto: str = Field(default="", max_length=600)
+    pantallas: List[str] = Field(min_length=1)
+    archivoUrl: str = ""
+    desde: str = ""
+    hasta: str = ""
+    dias: Literal["Todos", "Lunes a viernes", "Fines de semana"] = "Todos"
+    segundos: Optional[int] = Field(default=None, ge=3, le=600)
+    eventoFecha: str = ""
+    eventoHora: str = ""
+    eventoLugar: str = Field(default="", max_length=200)
+    eventoFrase: str = Field(default="", max_length=200)
+    fondoUrl: str = ""
+
+
+class RhPublicacionUpdateRequest(BaseModel):
+    activo: Optional[bool] = None
+    desde: Optional[str] = None
+    hasta: Optional[str] = None
+    dias: Optional[Literal["Todos", "Lunes a viernes", "Fines de semana"]] = None
+
+
+class FondoModel(BaseModel):
+    fondoId: str
+    nombre: str
+    url: str
+    tipo: Literal["fabrica", "subido"] = "subido"
+    creadoPor: Optional[str] = None
+    creado: Optional[str] = None
+    orden: int = 1000
+
+
+class FondoCreateRequest(BaseModel):
+    nombre: str = Field(min_length=1, max_length=80)
+    url: str = Field(min_length=10, max_length=500)
+
+
+class RhUploadRequest(BaseModel):
+    filename: str = Field(min_length=1, max_length=200)
+    contentType: Literal["image/jpeg", "image/png", "video/mp4"]

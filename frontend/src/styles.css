@@ -1039,3 +1039,17 @@ h2 {
     flex: 1;
   }
 }
+
+/* --- Login con correo + roles en el menú (sección de RH) --- */
+.login-form { display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 8px; }
+.login-separador { display: flex; align-items: center; gap: 10px; width: 100%; color: var(--text-muted); font-size: 13px; margin: 6px 0; }
+.login-separador::before, .login-separador::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.nav-titulo { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); margin: 14px 12px 6px; }
+.user-rol { display: block; font-size: 11px; color: var(--text-muted); }
+.usuarios-alta { margin-bottom: 16px; }
+.usuarios-fila { display: grid; grid-template-columns: 2fr 1.5fr 1.2fr auto; gap: 8px; margin: 8px 0; }
+@media (max-width: 800px) { .usuarios-fila { grid-template-columns: 1fr; } }
+
+.usuarios-link { margin-bottom: 16px; border: 1px solid var(--accent); }
+.usuarios-link-fila { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+.usuarios-link-fila .input { flex: 1; font-size: 12px; }

@@ -75,17 +75,29 @@ async def get_device_context(
 
 
 # --------------------------------------------------------------------------
-# Admin panel auth: Firebase ID token (Google sign-in) + email allow-list
+# Admin panel auth: Firebase ID token + roles
+#   - Correos de ADMIN_EMAIL_ALLOWLIST: administradores siempre (como antes).
+#   - Colección panel_users: los que da de alta un admin en "Usuarios", con
+#     rol admin / rh / lectura. Pueden entrar con Google o con correo y
+#     contraseña (p. ej. cuentas de Outlook).
 # --------------------------------------------------------------------------
-class AdminUser:
-    def __init__(self, uid: str, email: str):
+ROLES = ("admin", "rh", "lectura")
+
+
+class PanelUser:
+    def __init__(self, uid: str, email: str, rol: str, nombre: str = "", superadmin: bool = False):
         self.uid = uid
         self.email = email
+        self.rol = rol
+        self.nombre = nombre
+        self.superadmin = superadmin
 
 
-async def get_current_admin(
-    authorization: Optional[str] = Header(default=None),
-) -> AdminUser:
+class AdminUser(PanelUser):
+    pass
+
+
+def _decode_bearer(authorization: Optional[str]) -> dict:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -94,20 +106,46 @@ async def get_current_admin(
         )
     id_token = authorization.split(" ", 1)[1].strip()
     try:
-        decoded = firebase_auth.verify_id_token(id_token)
+        return firebase_auth.verify_id_token(id_token)
     except Exception as exc:  # invalid, expired, wrong audience, etc.
         logger.warning("Firebase ID token verification failed: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid ID token."
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid ID token.")
 
+
+async def resolve_panel_user(decoded: dict, repo: FirestoreRepo) -> PanelUser:
+    """Reglas de acceso, aparte para poder probarlas sin Firebase."""
     email = (decoded.get("email") or "").lower()
-    if not decoded.get("email_verified", False) or email not in settings.admin_email_allowlist_set:
+    if not email or not decoded.get("email_verified", False):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cuenta sin correo verificado.")
+    if email in settings.admin_email_allowlist_set:
+        return PanelUser(decoded.get("uid", ""), email, "admin", decoded.get("name") or "", superadmin=True)
+    doc = await repo.get_panel_user(email)
+    if not doc or doc.get("activo") is False or doc.get("rol") not in ROLES:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This account is not authorized to access the admin panel.",
         )
-    return AdminUser(uid=decoded["uid"], email=email)
+    return PanelUser(decoded.get("uid", ""), email, doc["rol"], doc.get("nombre") or "")
+
+
+async def get_current_user(
+    authorization: Optional[str] = Header(default=None),
+    repo: FirestoreRepo = Depends(get_repo),
+) -> PanelUser:
+    return await resolve_panel_user(_decode_bearer(authorization), repo)
+
+
+async def get_current_admin(user: PanelUser = Depends(get_current_user)) -> AdminUser:
+    if user.rol != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo administradores.")
+    return AdminUser(user.uid, user.email, user.rol, user.nombre, user.superadmin)
+
+
+async def get_rh_user(user: PanelUser = Depends(get_current_user)) -> PanelUser:
+    """Publicar / editar contenido de RH: admin o rh."""
+    if user.rol not in ("admin", "rh"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tu usuario solo puede ver, no publicar.")
+    return user
 
 
 # --------------------------------------------------------------------------

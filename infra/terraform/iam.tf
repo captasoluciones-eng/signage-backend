@@ -34,6 +34,13 @@ resource "google_project_iam_member" "backend_bigquery_job_user" {
   member  = "serviceAccount:${google_service_account.backend.email}"
 }
 
+# Alta de usuarios del panel (sección "Usuarios"): crear / desactivar cuentas de Firebase Auth.
+resource "google_project_iam_member" "backend_firebaseauth_admin" {
+  project = var.project_id
+  role    = "roles/firebaseauth.admin"
+  member  = "serviceAccount:${google_service_account.backend.email}"
+}
+
 resource "google_project_iam_member" "backend_storage_object_admin" {
   project = var.project_id
   role    = "roles/storage.objectAdmin"

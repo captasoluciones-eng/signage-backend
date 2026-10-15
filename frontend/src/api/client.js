@@ -50,7 +50,12 @@ async function request(path, { method = "GET", body, auth = true, headers = {} }
   const text = await res.text();
   const data = text ? JSON.parse(text) : null;
   if (!res.ok) {
-    const message = (data && (data.detail || data.message)) || res.statusText;
+    // FastAPI manda los errores de validación (422) como lista de objetos.
+    const detail = data && data.detail;
+    const message =
+      (Array.isArray(detail) ? detail.map((d) => d.msg).join("; ") : detail) ||
+      (data && data.message) ||
+      res.statusText;
     throw new Error(`${res.status} ${message}`);
   }
   return data;
@@ -132,6 +137,29 @@ export const api = {
   // Dashboard
   dashboardSummary: () => request("/admin/dashboard/summary"),
   whoami: () => request("/admin/whoami"),
+  me: () => request("/me"),
+
+  // Recursos humanos (publica en el Sheet de contenido a través del backend)
+  rhSucursales: () => request("/rh/sucursales"),
+  rhPantallas: () => request("/rh/pantallas"),
+  rhPublicaciones: () => request("/rh/publicaciones"),
+  rhPublicar: (payload) => request("/rh/publicaciones", { method: "POST", body: payload }),
+  rhActualizar: (id, cambios) =>
+    request(`/rh/publicaciones/${encodeURIComponent(id)}`, { method: "PATCH", body: cambios }),
+  rhDuplicar: (id) => request(`/rh/publicaciones/${encodeURIComponent(id)}/duplicar`, { method: "POST" }),
+  rhFondos: () => request("/rh/fondos"),
+  rhGuardarFondo: (nombre, url) => request("/rh/fondos", { method: "POST", body: { nombre, url } }),
+  rhBorrarFondo: (id) => request(`/rh/fondos/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  rhUploadUrl: (filename, contentType) =>
+    request("/rh/upload-url", { method: "POST", body: { filename, contentType } }),
+
+  // Usuarios del panel (solo administradores)
+  listUsuarios: () => request("/admin/usuarios"),
+  crearUsuario: (payload) => request("/admin/usuarios", { method: "POST", body: payload }),
+  linkContrasena: (email) =>
+    request(`/admin/usuarios/${encodeURIComponent(email)}/link-contrasena`, { method: "POST" }),
+  editarUsuario: (email, cambios) =>
+    request(`/admin/usuarios/${encodeURIComponent(email)}`, { method: "PATCH", body: cambios }),
 
   // Direct upload to a GCS signed URL (not through the API server).
   uploadToSignedUrl: async (uploadUrl, file, contentType) => {

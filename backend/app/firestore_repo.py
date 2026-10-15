@@ -23,6 +23,8 @@ COL_GROUPS = "groups"
 COL_PLAYLISTS = "playlists"
 COL_ASSETS = "assets"
 COL_RH_ANNOUNCEMENTS = "rh_announcements"
+COL_PANEL_USERS = "panel_users"
+COL_FONDOS = "fondos"  # galería de fondos para comunicados y eventos (fábrica + subidos por RH)  # usuarios del panel con rol (doc id = correo en minúsculas)
 SUBCOL_HEARTBEATS = "heartbeats"
 
 
@@ -318,6 +320,51 @@ class FirestoreRepo:
 
     async def delete_asset(self, asset_id: str) -> None:
         await self._client.collection(COL_ASSETS).document(asset_id).delete()
+
+    # ------------------------------------------------------------------
+    # Usuarios del panel (roles admin / rh / lectura). Los correos de la
+    # variable ADMIN_EMAIL_ALLOWLIST siguen siendo administradores siempre.
+    # ------------------------------------------------------------------
+    async def get_panel_user(self, email: str) -> Optional[dict]:
+        snap = await self._client.collection(COL_PANEL_USERS).document(email.lower()).get()
+        if not snap.exists:
+            return None
+        data = snap.to_dict() or {}
+        data["email"] = snap.id
+        return data
+
+    async def list_panel_users(self) -> list[dict]:
+        out = []
+        async for snap in self._client.collection(COL_PANEL_USERS).stream():
+            data = snap.to_dict() or {}
+            data["email"] = snap.id
+            out.append(data)
+        return sorted(out, key=lambda u: u["email"])
+
+    async def set_panel_user(self, email: str, fields: dict[str, Any]) -> None:
+        await self._client.collection(COL_PANEL_USERS).document(email.lower()).set(fields, merge=True)
+
+    async def list_fondos(self) -> list[dict]:
+        out = []
+        async for snap in self._client.collection(COL_FONDOS).stream():
+            data = snap.to_dict() or {}
+            data["fondoId"] = snap.id
+            out.append(data)
+        return out
+
+    async def get_fondo(self, fondo_id: str) -> Optional[dict]:
+        snap = await self._client.collection(COL_FONDOS).document(fondo_id).get()
+        if not snap.exists:
+            return None
+        data = snap.to_dict() or {}
+        data["fondoId"] = snap.id
+        return data
+
+    async def create_fondo(self, fondo_id: str, fields: dict[str, Any]) -> None:
+        await self._client.collection(COL_FONDOS).document(fondo_id).set(fields)
+
+    async def delete_fondo(self, fondo_id: str) -> None:
+        await self._client.collection(COL_FONDOS).document(fondo_id).delete()
 
     # ------------------------------------------------------------------
     # RH announcements (Content Studio "Convivencia / Anuncio RH" mode) --
